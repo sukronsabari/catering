@@ -9,6 +9,21 @@ use Illuminate\Validation\Rule;
 
 class ProductsRequest extends FormRequest
 {
+    protected function prepareForValidation()
+    {
+        $skus = $this->input('skus', []);
+
+        $this->merge([
+            'skus' => array_map(function ($sku) {
+                return [
+                    ...$sku,
+                    'is_active' => isset($sku['is_active']) && $sku['is_active'] === 'on' ? '1' : '0',
+                    'is_default' => isset($sku['is_default']) && $sku['is_default'] === 'on' ? '1' : '0',
+                ];
+            }, $skus),
+        ]);
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -31,11 +46,6 @@ class ProductsRequest extends FormRequest
             'images.*.file' => [strtoupper($this->method() === 'POST') ? 'required' : 'nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5000'],
             'images.*.path' => ['nullable', 'string'],
             'images.*.is_main' => ['required', 'boolean'],
-
-            // 'attributes_values' => ['nullable', 'array', 'max:2'],
-            // 'attributes_values.*.name' => ['nullable', 'string'],
-            // 'attributes_values.*.options' => ['nullable', 'array'],
-            // 'attributes_values.*.options.*' => ['nullable','string'],
 
             'skus' => ['nullable', 'array', 'min:1'],
             'skus.*.attribute_value' => ['required_with:skus', 'array'],

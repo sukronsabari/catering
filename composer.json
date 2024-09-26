@@ -6,16 +6,18 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "cviebrock/eloquent-sluggable": "^11.0",
         "laravel/framework": "^11.9",
         "laravel/tinker": "^2.9",
         "laravolt/indonesia": "^0.35.0",
         "livewire/livewire": "^3.5",
         "maatwebsite/excel": "^3.1",
+        "openspout/openspout": "^4.24",
         "power-components/livewire-powergrid": "^5.10",
-        "rappasoft/laravel-livewire-tables": "^3.4",
         "staudenmeir/laravel-adjacency-list": "^1.22"
     },
     "require-dev": {
+        "barryvdh/laravel-debugbar": "^3.13",
         "fakerphp/faker": "^1.23",
         "laravel/breeze": "^2.1",
         "laravel/pint": "^1.13",

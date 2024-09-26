@@ -73,14 +73,29 @@
                     </div>
 
                     <div class="col-span-6 bg-white border border-gray-200 rounded-lg shadow-sm  dark:border-gray-700 p-4 sm:p-6 dark:bg-gray-800">
-                        <div class="flex flex-col gap-4">
+                        <div
+                            class="flex flex-col gap-4"
+                            x-data="{
+                                previewImage(event) {
+                                    const input = event.target;
+                                    const file = input.files[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = (e) => {
+                                            document.getElementById('slider-image-preview').src = e.target.result;
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                }
+                            }"
+                        >
                             <div>
                                 <h3 class="mb-1 text-xl font-bold text-gray-900 dark:text-white">Image Preview</h3>
                                 <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">Upload a new image to replace the category image</p>
                                 <img id="slider-image-preview" class="rounded-lg w-full h-full object-cover aspect-[1300/500]" src="{{ \Illuminate\Support\Facades\Storage::url($slider->image) }}" alt="Image Profile">
                             </div>
                             <div>
-                                <x-input.file id="image-input" type="file" name="image" />
+                                <x-input.file id="image-input" type="file" name="image" @change="previewImage" />
                                 <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                     JPG, JPEG or PNG. Max size of 5MB with 13:5 Ratio
                                 </div>
@@ -98,24 +113,4 @@
             </form>
         </div>
     </div>
-
-    <script>
-        const input = document.getElementById('image-input');
-        const previewPhoto = () => {
-            const file = input?.files;
-
-            if (file) {
-                const fileReader = new FileReader();
-                const preview = document.getElementById('slider-image-preview');
-
-                fileReader.onload = function (event) {
-                    preview.setAttribute('src', event.target.result);
-                }
-
-                fileReader.readAsDataURL(file[0]);
-            }
-        }
-
-        input.addEventListener("change", previewPhoto);
-    </script>
 </x-admin-layout>

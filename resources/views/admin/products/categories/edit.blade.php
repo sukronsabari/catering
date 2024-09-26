@@ -44,8 +44,8 @@
                         <div
                             x-data="{
                                 open: false,
-                                selectedCategoryId: {{ json_encode(optional($category->parent_id)) }},
-                                selectedCategoryName: {{ json_encode(optional($category->parent->name)) }},
+                                selectedCategoryId: {{ json_encode($category->parent_id ?? null) }},
+                                selectedCategoryName: {{ json_encode(optional($category->parent)?->name) }},
 
                                 toggleDropdown() {
                                     this.open = !this.open;
@@ -61,6 +61,7 @@
                                 }
                             }"
                             class="relative"
+                            x-init="console.log(selectedCategoryId)"
                         >
                             <!-- Dropdown Button -->
                             <x-input.label for="" :required="false">Parent</x-input.label>
@@ -79,7 +80,7 @@
                             @enderror
 
                             <!-- Dropdown Content -->
-                            <div x-show="open" @click.away="open = false"
+                            <div x-cloak x-show="open" @click.outside="open = false"
                                 class="absolute z-10 left-0 mt-1 w-full text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
                                 <ul class="list-none p-2 text-sm">
                                     <div class="py-2 px-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
@@ -101,22 +102,37 @@
                         </div>
                     </div>
                     <div class="col-span-6 md:col-span-3 bg-white border border-gray-200 rounded-lg shadow-sm  dark:border-gray-700 p-4 sm:p-6 dark:bg-gray-800">
-                        <div class="flex flex-col gap-4">
+                        <div
+                            class="flex flex-col gap-4"
+                            x-data="{
+                                previewImage(event) {
+                                    const input = event.target;
+                                    const file = input.files[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = (e) => {
+                                            document.getElementById('category-image-preview').src = e.target.result;
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                }
+                            }"
+                        >
                             <div>
                                 <h3 class="mb-1 text-xl font-bold text-gray-900 dark:text-white">Image Preview</h3>
                                 @if ($category->image)
-                                    <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">Upload a new image to replace the category image</p>
+                                <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">Upload a new image to replace the category image</p>
                                 @else
-                                    <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                                        <span class="font-medium">No Image</span>
-                                        Upload a new image to set the category image
-                                    </p>
+                                <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                                    <span class="font-medium">No Image</span>
+                                    Upload a new image to set the category image
+                                </p>
                                 @endif
                                 <img id="category-image-preview" class="rounded-lg w-full h-full min-h-44 aspect-video object-contain"
                                     src="{{ \Illuminate\Support\Facades\Storage::url($category->image) }}" alt="Image preview">
                             </div>
                             <div>
-                                <x-input.file id="image-input" type="file" name="image" />
+                                <x-input.file id="image-input" type="file" name="image" @change="previewImage" />
                                 <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                     JPG, JPEG, or PNG. Max size of 5MB
                                 </div>
@@ -128,7 +144,22 @@
                     </div>
 
                     <div class="col-span-6 md:col-span-3 bg-white border border-gray-200 rounded-lg shadow-sm  dark:border-gray-700 p-4 sm:p-6 dark:bg-gray-800">
-                        <div class="flex flex-col gap-4">
+                        <div
+                            class="flex flex-col gap-4"
+                            x-data="{
+                                previewImage(event) {
+                                    const input = event.target;
+                                    const file = input.files[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = (e) => {
+                                            document.getElementById('category-icon-preview').src = e.target.result;
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                }
+                            }"
+                        >
                             <div>
                                 <h3 class="mb-1 text-xl font-bold text-gray-900 dark:text-white">Icon Preview</h3>
                                 @if ($category->icon)
@@ -143,7 +174,7 @@
                                     src="{{ \Illuminate\Support\Facades\Storage::url($category->icon) }}" alt="Icon preview">
                             </div>
                             <div>
-                                <x-input.file id="icon-input" type="file" name="icon" />
+                                <x-input.file id="icon-input" type="file" name="icon" @change="previewImage" />
                                 <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                     SVG or PNG. Max size of 5MB
                                 </div>
@@ -156,7 +187,7 @@
 
                     <div class="col-span-6 flex justify-end">
                         <div class="flex items-center space-x-3">
-                            <x-button type="submit">Update</x-button>
+                            <x-button type="submit">Save</x-button>
                         </div>
                     </div>
                 </div>

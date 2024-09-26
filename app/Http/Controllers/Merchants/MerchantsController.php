@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Laravolt\Indonesia\Facade as Indonesia;
 
@@ -18,16 +19,20 @@ class MerchantsController extends Controller
 {
     public function index(): View
     {
+        Gate::authorize('viewAny', Merchant::class);
         return view('admin.merchants.index');
     }
 
     public function create(): View
     {
+        Gate::authorize('create', Merchant::class);
         return view('admin.merchants.create');
     }
 
     public function store(MerchantsRequest $request): RedirectResponse
     {
+        Gate::authorize('create', Merchant::class);
+
         $bannerImagePath = null;
         $isOfficial = $request->is_official === '1';
         $selectedUser = User::findOrFail($request->user_id);
@@ -55,8 +60,8 @@ class MerchantsController extends Controller
         DB::transaction(function () use ($selectedUser, $request, $isOfficial, $bannerImagePath) {
             $selectedUser->fill(['role' => UserRole::Merchant])->save();
 
-            $filteredSocialLinks = array_filter($request->social_links, function ($link) {
-                return !empty($link['platform']) && !empty($link['link']);
+            $filteredSocialLinks = array_filter($request->social_links, function ($item) {
+                return !empty($item['platform']) && !empty($item['link']);
             });
 
             $merchant = $selectedUser->merchant()->create([
@@ -65,7 +70,7 @@ class MerchantsController extends Controller
                 'banner_image' => $bannerImagePath ?? env('DEFAULT_MERCHANT_BANNER', 'images/merchants/banners/default.png'),
                 'description' => $request->description,
                 'phone' => $request->phone,
-                'social_links' => $filteredSocialLinks,
+                'social_links' => json_encode($filteredSocialLinks),
             ]);
 
             $province = Indonesia::findProvince($request->province, null);
@@ -83,14 +88,16 @@ class MerchantsController extends Controller
             ]);
         });
 
+        $callbackUrl = $request->query('callbackUrl', route('admin.merchants.index'));
+
         if ($request->has('create_another')) {
-            return redirect()->route('admin.merchants.create')->with('toast-notification', [
+            $createPageUrlWithParams = route('admin.products.categories.create') . '?callbackUrl=' . rawurlencode($callbackUrl);
+
+            return redirect($createPageUrlWithParams)->with('toast-notification', [
                 'type' => 'success',
                 'message' => "New merchant has been added! You can create another one.",
             ]);
         }
-
-        $callbackUrl = $request->query('callbackUrl', route('admin.merchants.index'));
 
         return redirect($callbackUrl)
             ->with('toast-notification', [
@@ -101,6 +108,8 @@ class MerchantsController extends Controller
 
     public function edit(Merchant $merchant): View
     {
+        Gate::authorize('update', Merchant::class);
+
         return view('admin.merchants.edit', [
             'merchant' => $merchant,
         ]);
@@ -108,6 +117,8 @@ class MerchantsController extends Controller
 
     public function update(MerchantsRequest $request, Merchant $merchant): RedirectResponse
     {
+        Gate::authorize('update', Merchant::class);
+
         $bannerImagePath = $merchant->banner_image;
         $isOfficial = $request->is_official === '1';
         $selectedUser = User::findOrFail((int) $request->user_id);
@@ -167,6 +178,8 @@ class MerchantsController extends Controller
 
     public function destroy(Request $request, Merchant $merchant): RedirectResponse
     {
+        Gate::authorize('delete', Merchant::class);
+        
         try {
             $defaultMerchantBanner = env('DEFAULT_MERCHANT_BANNER', 'images/merchants/banners/default.png');
             $bannerImagePath = $merchant->banner_image;

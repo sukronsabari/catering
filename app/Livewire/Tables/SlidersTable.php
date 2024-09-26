@@ -2,238 +2,293 @@
 
 namespace App\Livewire\Tables;
 
+use App\Enums\UserRole;
 use App\Models\Slider;
-use Carbon\Carbon;
-use App\Exports\SlidersExport;
-use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
-use Maatwebsite\Excel\Facades\Excel;
-use Rappasoft\LaravelLivewireTables\DataTableComponent;
-use Rappasoft\LaravelLivewireTables\Views\Column;
-use Rappasoft\LaravelLivewireTables\Views\Columns\BooleanColumn;
-use Rappasoft\LaravelLivewireTables\Views\Filters\DateFilter;
-use Rappasoft\LaravelLivewireTables\Views\Filters\SelectFilter;
-use Rappasoft\LaravelLivewireTables\Views\Filters\TextFilter;
+use PowerComponents\LivewirePowerGrid\Facades\Filter;
+use PowerComponents\LivewirePowerGrid\Traits\WithExport;
+use PowerComponents\LivewirePowerGrid\{
+    Button,
+    Column,
+    Exportable,
+    Header,
+    Footer,
+    PowerGrid,
+    PowerGridFields,
+    PowerGridComponent
+};
 
-class SlidersTable extends DataTableComponent
+final class SlidersTable extends PowerGridComponent
 {
-    protected $model = Slider::class;
-    public array $bulkActions = [
-        'exportToExcel' => 'Export',
-        'openBulkDeleteModal' => 'Delete',
-        'openBulkUpdateModal' => 'Set Active',
-    ];
+    use WithExport;
 
-    public function configure(): void
+    public string $tableName = 'sliders';
+    public bool $deferLoading = true;
+    public string $loadingComponent = 'components.loading.datatable-loading';
+
+    protected function queryString(): array
     {
-        $this
-            ->setPrimaryKey('id')
-            ->setDefaultSort('id', 'asc')
-            ->setComponentWrapperAttributes([
-                'default' => true,
-                'class' => 'px-4 py-8',
-            ])
-            ->setTheadAttributes([
-                'default' => true,
-                'class' => 'bg-gray-100',
-            ]);
+        return $this->powerGridQueryString();
+    }
 
-        $this->setTableWrapperAttributes([
-            'default' => true,
-            'class' => 'min-h-[500px]',
-        ]);
+    public function setUp(): array
+    {
+        $this->showCheckBox();
+        // $this->persist(
+        //     tableItems: ['columns', 'filters', 'sort'],
+        //     prefix: Auth::user()->id,
+        // );
 
-        $this->setSearchDebounce(400);
-        $this->setSearchPlaceholder('Search for slider...');
+        return [
+            Exportable::make('sliders')
+                ->striped()
+                ->type(Exportable::TYPE_XLS, Exportable::TYPE_CSV),
+                // ->queues(6)
+                // ->onQueue('my-dishes')
+                // ->onConnection('redis'),
+            Header::make()
+                ->showSearchInput()
+                ->showToggleColumns(),
+                // ->includeViewOnTop('components.datatables.table-header'),
+            Footer::make()
+                ->showPerPage(perPage: 10, perPageValues: [0, 4, 10, 50, 100, 500])
+                ->showRecordCount('full'),
+        ];
+    }
 
-        $this->setConfigurableAreas([
-            'before-toolbar' => [
-                'components.datatables.link',
-                [
-                    'withIcon' => true,
-                    'icon' => 'ti ti-plus',
-                    'text' => 'Add Slider',
-                    'id' => 'add-button-before-toolbar',
-                    'href' => route('admin.sliders.create'),
-                ]
-            ],
-        ]);
+    public function datasource(): Builder
+    {
+        return Slider::query();
+    }
+
+    public function fields(): PowerGridFields
+    {
+        return PowerGrid::fields()
+            ->add('id')
+            ->add('title')
+            ->add('subtitle')
+            ->add('starting_price')
+            ->add('is_active')
+            ->add('position')
+            ->add('url')
+            ->add('created_at')
+            ->add('updated_at')
+            ->add('created_at_formatted', fn(Slider $row) => Carbon::parse($row->created_at)->format('d/m/Y'))
+            ->add('updated_at_formatted', fn(Slider $row) => Carbon::parse($row->updated_at)->format('d/m/Y'));
     }
 
     public function columns(): array
     {
         return [
-            Column::make("Id", "id")
-                ->excludeFromColumnSelect()
+            Column::make('ID', 'id')
+                ->searchable()
                 ->sortable(),
-            Column::make("Title", "title")
-                ->excludeFromColumnSelect()
+            Column::make('Title', 'title')
                 ->searchable(),
-            Column::make("Subtitle", "subtitle")
-                ->excludeFromColumnSelect()
+            Column::make('Subtitle', 'subtitle')
                 ->searchable(),
-            Column::make("Starting Price (IDR)", "starting_price")
-                ->excludeFromColumnSelect()
-                ->format(fn($value, $row, Column $column) => (int) $value)
+            Column::make('Starting Price', 'starting_price')
                 ->sortable(),
-            Column::make("Position", "position")
-                ->excludeFromColumnSelect()
+            Column::make('Active', 'is_active')
+                ->toggleable(
+                    hasPermission: Auth::user()->role === UserRole::Admin,
+                    trueLabel: 'Yes',
+                    falseLabel: 'No'
+                )
                 ->sortable(),
-            BooleanColumn::make("Active", "is_active")
+            Column::make('Position', 'position')
                 ->sortable(),
-            Column::make("Url", "url")
-                ->collapseAlways(),
-            Column::make("Image", "image")
-                ->collapseAlways(),
-            Column::make("Created at", "created_at")
-                ->format(fn($value, $row, Column $column) => Carbon::parse($value)->format('d M Y'))
-                ->sortable(),
-            Column::make("Updated at", "updated_at")
-                ->format(fn($value, $row, Column $column) => Carbon::parse($value)->format('d M Y'))
-                ->sortable(),
-            Column::make('Action')
-                ->label(
-                    fn($row, Column $column) => view('components.datatables.action-column')->with(
-                        [
-                            'editLink' => route(
-                                'admin.sliders.edit',
-                                [
-                                    'slider' => $row,
-                                    'callbackUrl' => route('admin.sliders.index', [], false)
-                                ]
-                            ),
-                            'deleteLink' => route(
-                                'admin.sliders.destroy',
-                                [
-                                    'slider' => $row,
-                                    'callbackUrl' => route('admin.sliders.index', [], false)
-                                ]
-                            ),
-                        ]
-                    )
-                ),
+            Column::make('Url (Relative)', 'url')
+                ->hidden(true, false)
+                ->visibleInExport(true),
+            Column::make('Created At', 'created_at_formatted', 'created_at'),
+            Column::make('Updated At', 'updated_at_formatted', 'updated_at'),
+            Column::action('Action')
+                ->visibleInExport(false)
         ];
     }
 
     public function filters(): array
     {
         return [
-            SelectFilter::make('Active')
-                ->options([
-                    '' => 'All',
-                    '1' => 'Yes',
-                    '0' => 'No',
-                ])
-                ->filter(function (Builder $builder, string $value) {
-                    if ($value === '1') {
-
-                        /** @disregard Builder $builder */
-                        $builder->where('is_active', true);
-                    } elseif ($value === '0') {
-                        /** @disregard Builder $builder */
-                        $builder->where('is_active', false);
-                    }
-                }),
-            TextFilter::make('Min Price')
-                ->config([
-                    'placeholder' => 'Enter Price'
-                ])
-                ->filter(function (Builder $builder, string $value) {
-                    /** @disregard Builder $builder */
-                    // dd($value);
-                    $builder->where('starting_price', '>=', (int) $value);
-                }),
-            TextFilter::make('Max Price')
-                ->config([
-                    'placeholder' => 'Enter Price'
-                ])
-                ->filter(function (Builder $builder, string $value) {
-                    /** @disregard Builder $builder */
-                    $builder->where('starting_price', '<=', (int) $value);
-                }),
-            DateFilter::make('Create From')
-                ->filter(function (Builder $builder, string $value) {
-                    $dateTimeValue = Carbon::parse($value)->startOfDay()->toDateTimeString();
-
-                    /** @disregard Builder $builder */
-                    $builder->where('created_at', '>=', $dateTimeValue);
-                }),
-            DateFilter::make('Create To')
-                ->filter(function (Builder $builder, string $value) {
-                    $dateTimeValue = Carbon::parse($value)->endOfDay()->toDateTimeString();
-
-                    // dd($dateTimeValue);
-                    /** @disregard Builder $builder */
-                    $builder->where('created_at', '<=', $dateTimeValue);
-                }),
+            Filter::datepicker('created_at_formatted', 'created_at'),
+            Filter::datepicker('updated_at_formatted', 'updated_at'),
+            Filter::boolean('is_active')
+                ->label('yes', 'no'),
         ];
     }
 
-    public function exportToExcel()
+    public function header(): array
     {
-        $selectedIds = $this->getSelected();
-        return Excel::download(new SlidersExport($selectedIds), 'sliders.xlsx');
+        return [
+            Button::add('bulk-delete')
+                ->class("md:mr-8 focus:ring-primary-600 focus-within:focus:ring-primary-600 focus-within:ring-primary-600 dark:focus-within:ring-primary-600 flex rounded-md ring-1 transition focus-within:ring-2 dark:ring-pg-primary-600 dark:text-pg-primary-300 text-gray-600 ring-gray-300 dark:bg-pg-primary-800 bg-white dark:placeholder-pg-primary-400 rounded-md border-0 bg-transparent py-2 px-3 ring-0 placeholder:text-gray-400 focus:outline-none sm:text-sm sm:leading-6 w-auto")
+                ->slot('
+                    <div class="flex">
+                        <div class="h-5 w-5 inline-flex justify-center items-center text-pg-primary-500 dark:text-pg-primary-300">
+                            <i class="ti ti-trash text-xl"></i>
+                        </div>
+                    </div>
+                ')
+                ->tooltip('Bulk Delete')
+                ->dispatch('open-bulk-delete-slider-modal', []),
+        ];
     }
 
-    public function openBulkDeleteModal()
+    public function actions(Slider $row): array
     {
-        if (!$this->getSelected()) {
-            return;
-        }
-
-        $this->dispatch('bulk-delete-sliders-modal', ids: $this->getSelected());
+        return [
+            Button::add('edit')
+                ->slot('
+                    <span class="inline-flex items-center justify-center gap-2">
+                        <i class="ti ti-edit text-2xl text-blue-500"></i>
+                        Edit
+                    </span>
+                ')
+                ->class('text-slate-500 flex gap-2 hover:text-slate-700 hover:bg-slate-100 font-bold p-1 px-2 rounded')
+                ->dispatchSelf('edit-slider', ['slider' => $row]),
+            Button::add('delete')
+                ->slot('
+                    <span class="inline-flex items-center justify-center gap-2">
+                        <i class="ti ti-trash text-2xl text-red-500"></i>
+                        Delete
+                    </span>
+                ')
+                ->class('text-slate-500 flex gap-2 hover:text-slate-700 hover:bg-slate-100 font-bold p-1 px-2 rounded')
+                ->dispatch('open-delete-slider-modal', ['id' => $row->id]),
+        ];
     }
 
-    public function openBulkUpdateModal()
+    public function onUpdatedToggleable(string|int $id, string $field, string $value): void
     {
-        if (!$this->getSelected()) {
-            return;
-        }
-
-        $this->dispatch('bulk-update-sliders-modal', ids: $this->getSelected());
-    }
-
-    #[On('bulk-delete-sliders')]
-    public function deleteSelected($ids, $queryParams)
-    {
-        if (empty($ids)) {
-            return;
-        }
-
-        DB::transaction(function () use ($ids) {
-            Slider::whereIn('id', $ids)->delete();
-        });
-
-        session()->flash('toast-notification', [
-            'message' => 'Selected sliders have been deleted successfully.',
-            'type' => 'success',
-        ]);
-        $this->clearSelected();
-
-        $callbackUrl = route('admin.sliders.index') . ($queryParams ? "?{$queryParams}" : '');
-        return $this->redirect($callbackUrl);
-    }
-
-    #[On('bulk-update-sliders')]
-    public function setSelectedActive($ids, $queryParams)
-    {
-        if (empty($ids)) {
-            return;
-        }
-
-        DB::transaction(function () use ($ids) {
-            Slider::whereIn('id', $ids)->update(['is_active' => true]);
-        });
-
-        session()->flash('toast-notification', [
-            'message' => 'Selected sliders have been activate successfully.',
-            'type' => 'success',
+        Slider::query()->find($id)->update([
+            $field => e($value),
         ]);
 
-        $this->clearSelected();
+        $this->skipRender();
+    }
 
-        $callbackUrl = route('admin.sliders.index') . ($queryParams ? "?{$queryParams}" : '');
-        return $this->redirect($callbackUrl);
+
+    #[On('add-slider')]
+    public function addSlider(): void
+    {
+        $this->js('
+            let queryParams = decodeURIComponent(new URLSearchParams(window.location.search).toString());
+            $wire.dispatchTo("tables.sliders-table", "redirect-to-create-page", { queryParams: queryParams })
+        ');
+    }
+
+    #[On('edit-slider')]
+    public function editSlider(Slider $slider): void
+    {
+        $this->js('
+            let queryParams = decodeURIComponent(new URLSearchParams(window.location.search).toString());
+            $wire.dispatchTo("tables.sliders-table", "redirect-to-edit-page", { id: ' . $slider->id . ', queryParams: queryParams })
+        ');
+    }
+
+    #[On('redirect-to-create-page')]
+    public function redirectToCreatePage(string $queryParams = ''): void
+    {
+        $createPage = route('admin.sliders.create', [], false);
+        $callbackUrl = route('admin.sliders.index', [], false) . ($queryParams ? "?{$queryParams}" : '');
+
+
+        $encodedCallbackUrl = rawurlencode($callbackUrl);
+        $createPageWithParams = $createPage . "?callbackUrl=" . $encodedCallbackUrl;
+
+        $this->redirect($createPageWithParams, true);
+    }
+
+    #[On('redirect-to-edit-page')]
+    public function redirectToEditPage(int|string $id, string $queryParams = ''): void
+    {
+        $editPage = route('admin.sliders.edit', ['slider' => $id], false);
+        $callbackUrl = route('admin.sliders.index', [], false) . ($queryParams ? "?{$queryParams}" : '');
+
+        $encodedCallbackUrl = rawurlencode($callbackUrl);
+        $editPageWithParams = $editPage . "?callbackUrl=" . $encodedCallbackUrl;
+
+        $this->redirect($editPageWithParams, true);
+    }
+
+    #[On('delete-slider')]
+    public function delete(string|int $id, string $queryParams = '')
+    {
+        if ($id) {
+            Gate::authorize("delete", Slider::class);
+
+            $slider = Slider::query()->findOrFail($id);
+            $callbackUrl = route('admin.sliders.index') . ($queryParams ? "?{$queryParams}" : '');
+
+            try {
+                $imagePath = $slider->image;
+
+                if ($imagePath && Storage::disk('public')->exists($imagePath)) {
+                    Storage::disk('public')->delete($imagePath);
+                }
+            } catch (\Exception $e) {
+                session()->flash('toast-notification', [
+                    'type' => 'danger',
+                    'message' => "There was an error deleting file for slider. Please try again.",
+                ]);
+
+                return $this->redirect($callbackUrl, true);
+            }
+
+            $slider->delete();
+            session()->flash('toast-notification', [
+                'type' => 'danger',
+                'message' => "Slider has been deleted!",
+            ]);
+
+            return $this->redirect($callbackUrl, true);
+        }
+    }
+
+    #[On('bulk-delete-slider')]
+    public function bulkDelete(string $queryParams = '')
+    {
+        if ($this->checkboxValues && !empty($this->checkboxValues)) {
+            Gate::authorize("delete", Slider::class);
+
+            $sliders = Slider::query()->findMany($this->checkboxValues);
+            $callbackUrl = route('admin.sliders.index') . ($queryParams ? "?{$queryParams}" : '');
+
+            foreach($sliders as $slider) {
+                try {
+                    $imagePath = $slider->image;
+
+                    if ($imagePath && Storage::disk('public')->exists($imagePath)) {
+                        Storage::disk('public')->delete($imagePath);
+                    }
+                } catch (\Exception $e) {
+                    session()->flash('toast-notification', [
+                        'type' => 'danger',
+                        'message' => 'There was an error deleting file for slider. Please try again.'
+                    ]);
+
+                    return $this->redirect($callbackUrl, true);
+                }
+            }
+
+            DB::transaction(function () {
+                Slider::destroy($this->checkboxValues);
+            });
+
+            session()->flash('toast-notification', [
+                'type' => 'danger',
+                'message' => "Sliders has been deleted!",
+            ]);
+
+            $this->js('window.pgBulkActions.clearAll()');
+            return $this->redirect($callbackUrl, true);
+        }
     }
 }

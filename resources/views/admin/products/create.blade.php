@@ -3,15 +3,26 @@
         [
             'label' => 'Active',
             'value' => '1',
-            'selected' => old('is_active') == '1'
+            'selected' => old('is_active') == '1',
         ],
         [
             'label' => 'Non Active',
             'value' => '0',
-            'selected' => old('is_active') == '0'
+            'selected' => old('is_active') == '0',
         ],
     ];
+
+    $oldSkus = old('skus', []);
+
+    $mappedSkus = array_map(function ($sku) {
+        return [
+            ...$sku,
+            'is_active' => isset($sku['is_active']) && $sku['is_active'] == 'on' ? true : false,
+            'is_default' => isset($sku['is_default']) && $sku['is_default'] == 'on' ? true : false,
+        ];
+    }, $oldSkus);
 @endphp
+
 
 <x-admin-layout>
     {{-- Header --}}
@@ -24,58 +35,49 @@
     </div>
 
 
-    @dump($errors)
     {{-- Content --}}
-    <div
-        class="px-4 pt-6"
-        x-data="{
-            attributes: {{ json_encode(old('attribute_values', [])) }},
-            attributeCombinations: [],
-            // skus: [],
-            selectedDefaultSku: 0,
-            addAttribute() {
-                if (this.attributes.length < 2) {
-                    this.attributes.push({ name: '', options: [] });
-                    this.generateCombinations();
-                }
-            },
-            removeAttribute(index) {
-                this.attributes.splice(index, 1);
-                this.generateCombinations();
-            },
-            generateCombinations() {
-                // Extract names and options
-                const attributesFilter = this.attributes.filter(attr => attr.options.length && attr.name);
-
-                const attributeNames = attributesFilter.map(attr => attr.name);
-                const attributeOptions = attributesFilter.map(attr => attr.options);
-
-
-                if (!attributeOptions.length || !attributeNames.length) {
-                    return this.attributeCombinations = [];
-                }
-
-                const combinations = this.cartesianProduct(attributeOptions);
-
-                // Format combinations with attribute names
-                this.attributeCombinations = combinations.map(combination =>
-                    combination.map((option, index) => ({
-                        attribute: attributeNames[index],
-                        value: option
-                    }))
-                );
-            },
-            cartesianProduct(arrays) {
-                return arrays.reduce((acc, array) =>
-                    acc.flatMap(d => array.map(e => [...d, e]))
-                , [[]]);
-            },
-        }"
-        x-init="generateCombinations()"
-    >
+    <div class="px-4 pt-6" x-data="{
+        variants: {{ json_encode(old('variants', [])) }},
+        skus: {{ json_encode($mappedSkus) }},
+        isDefaultIndex: null,
+        addVariant() {
+            this.variants.push({ type: '', options: [] });
+        },
+        removeVariant(index) {
+            this.variants.splice(index, 1);
+            this.generateSkus();
+        },
+        generateSkus() {
+            this.skus = [];
+            const combinations = this.getCombinations(this.variants.map(v => v.options));
+            combinations.forEach((combination, index) => {
+                this.skus.push({
+                    attribute_value: combination.map((val, idx) => ({
+                        attribute: this.variants[idx].type,
+                        value: val
+                    })),
+                    price: '',
+                    stock: '',
+                    weight: '',
+                    sku: '',
+                    is_active: true,
+                    is_default: index === 0,
+                });
+            });
+        },
+        getCombinations(arrays) {
+            return arrays.reduce((a, b) =>
+                a.flatMap(d => b.map(e => [...d, e])), [
+                    []
+                ]);
+        }
+    }"
+    x-init="$watch('skus', function(value) {
+        console.log(value);
+    })">
         <div
             class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 sm:p-6 dark:bg-gray-800 text-gray-900 dark:text-white">
-            <form action="{{  route('admin.products.store') }}" method="POST" enctype="multipart/form-data" novalidate>
+            <form action="{{ route('admin.products.store') }}" method="POST" enctype="multipart/form-data" novalidate>
                 @method('POST')
                 @csrf
                 <div class="grid grid-cols-6 gap-6">
@@ -87,42 +89,44 @@
                             <x-input.error :messages="$message" class="mt-2" />
                         @enderror
                     </div>
-                    <div class="col-span-6 sm:col-span-3" x-show="!attributeCombinations.length">
+                    <div class="col-span-6 sm:col-span-3" x-show="!skus.length">
                         <x-input.label for="price">Price</x-input.label>
                         <x-input.text id="price" type="text" name="price" inputmode="numeric" class="mt-1"
-                            value="{{ old('price') }}" x-bind:disabled="attributeCombinations.length > 0" />
+                            value="{{ old('price') }}" x-bind:disabled="skus.length > 0" />
                         @error('price')
                             <x-input.error :messages="$message" class="mt-2" />
                         @enderror
                     </div>
-                    <div class="col-span-6 sm:col-span-3" x-show="!attributeCombinations.length">
+                    <div class="col-span-6 sm:col-span-3" x-show="!skus.length">
                         <x-input.label for="stock">Stock</x-input.label>
                         <x-input.text id="stock" type="text" name="stock" inputmode="numeric" class="mt-1"
-                            value="{{ old('stock') }}" x-bind:disabled="attributeCombinations.length > 0" />
+                            value="{{ old('stock') }}" x-bind:disabled="skus.length > 0" />
                         @error('stock')
                             <x-input.error :messages="$message" class="mt-2" />
                         @enderror
                     </div>
-                    <div class="col-span-6 sm:col-span-3" x-show="!attributeCombinations.length">
+                    <div class="col-span-6 sm:col-span-3" x-show="!skus.length">
                         <x-input.label for="weight">Weight (Gram)</x-input.label>
                         <x-input.text id="weight" type="text" name="weight" inputmode="numeric" class="mt-1"
-                            value="{{ old('weight') }}" x-bind:disabled="attributeCombinations.length > 0" />
+                            value="{{ old('weight') }}" x-bind:disabled="skus.length > 0" />
                         @error('weight')
                             <x-input.error :messages="$message" class="mt-2" />
                         @enderror
                     </div>
-                    <div class="col-span-6 sm:col-span-3" x-show="!attributeCombinations.length">
+                    <div class="col-span-6 sm:col-span-3" x-show="!skus.length">
                         <x-input.label :required="false" for="sku">SKU</x-input.label>
-                        <x-input.text id="sku" type="text" name="sku" class="mt-1" value="{{ old('sku') }}" x-bind:disabled="attributeCombinations.length > 0" />
+                        <x-input.text id="sku" type="text" name="sku" class="mt-1"
+                            value="{{ old('sku') }}" x-bind:disabled="skus.length > 0" />
                         @error('sku')
                             <x-input.error :messages="$message" class="mt-2" />
                         @enderror
                     </div>
-                    <div class="col-span-6 sm:col-span-3" x-show="!attributeCombinations.length">
+                    <div class="col-span-6 sm:col-span-3" x-show="!skus.length">
                         <x-input.label for="is_active">Status</x-input.label>
-                        <x-input.select id="is_active" name="is_active" :options="$activeOptions" class="mt-1" x-bind:disabled="attributeCombinations.length > 0" />
+                        <x-input.select id="is_active" name="is_active" :options="$activeOptions" class="mt-1"
+                            x-bind:disabled="skus.length > 0" />
                         @error('is_active')
-                        <x-input.error :messages="$message" class="mt-2" />
+                            <x-input.error :messages="$message" class="mt-2" />
                         @enderror
                     </div>
                     <div class="col-span-6 sm:col-span-3">
@@ -134,26 +138,24 @@
                     </div>
 
                     <div class="col-span-6 sm:col-span-3">
-                        <div
-                            x-data="{
-                                open: false,
-                                selectedCategoryId: {{ json_encode(old('category_id') ?? null) }},
-                                selectedCategoryName: {{ json_encode($categories->where('id', old('category_id'))?->first()?->name ?? '') }},
+                        <div x-data="{
+                            open: false,
+                            selectedCategoryId: {{ json_encode(old('category_id') ?? null) }},
+                            selectedCategoryName: {{ json_encode($categories->where('id', old('category_id'))?->first()?->name ?? '') }},
 
-                                toggleDropdown() {
-                                    this.open = !this.open;
-                                },
-                                selectCategory(id, name) {
-                                    this.selectedCategoryId = id;
-                                    this.selectedCategoryName = name;
+                            toggleDropdown() {
+                                this.open = !this.open;
+                            },
+                            selectCategory(id, name) {
+                                this.selectedCategoryId = id;
+                                this.selectedCategoryName = name;
 
-                                    this.open = false;
-                                },
-                                isSelected(categoryId) {
-                                    return this.selectedCategoryId == categoryId;
-                                }
-                            }"
-                            class="relative">
+                                this.open = false;
+                            },
+                            isSelected(categoryId) {
+                                return this.selectedCategoryId == categoryId;
+                            }
+                        }" class="relative">
                             <!-- Dropdown Button -->
                             <x-input.label>Category</x-input.label>
                             <button x-cloak type="button" @click="toggleDropdown()"
@@ -196,49 +198,48 @@
                         @enderror
                     </div>
 
-                    <div class="col-span-6"
-                        x-data="{
-                            fields: [{
-                                id: Date.now(),
-                                image: null,
-                                isMain: true,
-                                path: null,
-                            }],
-                            addNewField() {
-                                if (this.fields.length < 9) {
-                                    this.fields.push({
-                                        id: Date.now(),
-                                        image: null,
-                                        isMain: false,
-                                        path: null,
-                                    });
-                                }
-                            },
-                            removeField(index) {
-                                if (this.fields.length > 1) {
-                                    this.fields.splice(index, 1);
-                                }
-                            },
-                            previewImage(event, index) {
-                                const input = event.target;
-                                const file = input.files[0];
-                                if (file) {
-                                    const reader = new FileReader();
-                                    reader.onload = (e) => {
-                                        this.fields[index].image = e.target.result;
-                                        this.fields[index].path = null;
-                                    };
-                                    reader.readAsDataURL(file);
-                                }
-                            },
-                            setMainPhoto(index) {
-                                this.fields.forEach((field, i) => field.isMain = i === index);
+                    <div class="col-span-6" x-data="{
+                        fields: [{
+                            id: Date.now(),
+                            image: null,
+                            isMain: true,
+                            path: null,
+                        }],
+                        addNewField() {
+                            if (this.fields.length < 9) {
+                                this.fields.push({
+                                    id: Date.now(),
+                                    image: null,
+                                    isMain: false,
+                                    path: null,
+                                });
                             }
-                        }"
-                    >
+                        },
+                        removeField(index) {
+                            if (this.fields.length > 1) {
+                                this.fields.splice(index, 1);
+                            }
+                        },
+                        previewImage(event, index) {
+                            const input = event.target;
+                            const file = input.files[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    this.fields[index].image = e.target.result;
+                                    this.fields[index].path = null;
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        },
+                        setMainPhoto(index) {
+                            this.fields.forEach((field, i) => field.isMain = i === index);
+                        }
+                    }">
                         <div class="flex items-center justify-between">
                             <x-input.label>Product Image (Max: 9)</x-input.label>
-                            <x-button.light @click="addNewField()" class="!p-2.5 text-center inline-flex items-center">
+                            <x-button.light @click="addNewField()"
+                                class="!p-2.5 text-center inline-flex items-center">
                                 <span class="flex items-center justify-center w-5 h-5">
                                     <i class="ti ti-plus text-xl"></i>
                                 </span>
@@ -246,7 +247,8 @@
                         </div>
                         <div class="flex items-center gap-4 flex-wrap">
                             <template x-for="(field, index) in fields" :key="field.id">
-                                <div class="relative flex items-center justify-center w-36 h-36 overflow-hidden border-2 border-gray-300 border-dashed rounded-lg">
+                                <div
+                                    class="relative flex items-center justify-center w-36 h-36 overflow-hidden border-2 border-gray-300 border-dashed rounded-lg">
                                     <label
                                         class="h-full w-full flex flex-col items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100">
                                         <div class="flex flex-col items-center justify-center pt-5 pb-6"
@@ -257,7 +259,8 @@
                                             <p class="mb-2 text-sm text-gray-500"
                                                 x-text="field.isMain ? 'Main Image' : `Image ${index + 1}`"></p>
                                         </div>
-                                        <input type="file" accept="image/*" class="hidden" :name="'images[' + index + '][file]'"
+                                        <input type="file" accept="image/*" class="hidden"
+                                            :name="'images[' + index + '][file]'"
                                             @change="previewImage($event, index)" />
 
                                         <!-- Preview Gambar -->
@@ -265,23 +268,29 @@
                                             class="object-cover w-full h-full" />
 
                                         @foreach ($errors->get('images.*') as $message)
-                                        <x-input.error :messages="$message" class="" x-cloak x-show="!field.image && !field.path" />
+                                            <x-input.error :messages="$message" class="" x-cloak
+                                                x-show="!field.image && !field.path" />
                                         @endforeach
                                     </label>
 
 
                                     <!-- Tombol Hapus -->
-                                    <button type="button" class="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full"
-                                        @click="removeField(index)" x-show="fields.length > 1 && !field.isMain">✕</button>
+                                    <button type="button"
+                                        class="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full"
+                                        @click="removeField(index)"
+                                        x-show="fields.length > 1 && !field.isMain">✕</button>
 
                                     <!-- Tombol Set Foto Utama -->
-                                    <button type="button" class="absolute bottom-1 left-1 bg-green-500 text-white p-1 rounded"
+                                    <button type="button"
+                                        class="absolute bottom-1 left-1 bg-green-500 text-white p-1 rounded"
                                         @click="setMainPhoto(index)" x-show="field.image || field.path"
                                         x-text="field.isMain ? 'Main Image' : 'Set Main'"></button>
 
                                     <!-- Input Tersembunyi untuk Menyimpan Status Gambar Utama -->
-                                    <input type="hidden" :name="'images[' + index + '][is_main]'" :value="field.isMain ? '1' : '0'" />
-                                    <input type="hidden" :name="'images[' + index + '][path]'" :value="field.path" />
+                                    <input type="hidden" :name="'images[' + index + '][is_main]'"
+                                        :value="field.isMain ? '1' : '0'" />
+                                    <input type="hidden" :name="'images[' + index + '][path]'"
+                                        :value="field.path" />
                                 </div>
                             </template>
                         </div>
@@ -289,13 +298,15 @@
                     </div>
 
                     <div class="col-span-6">
+
                         <div class="flex justify-between items-center">
                             <div>
                                 <h4 class="text-gray-800 font-semibold text-lg sm:text-lg mb-1">Product Variant</h4>
-                                <p class="text-gray-600 dark:text-white text-sm">You can add up to 2 product variations</p>
+                                <p class="text-gray-600 dark:text-white text-sm">You can add up to 2 product variations
+                                </p>
                             </div>
                             <div>
-                                <x-button.light @click="addAttribute" x-show="attributes.length < 2"
+                                <x-button.light @click="addVariant" x-show="variants.length < 2"
                                     class="!p-2.5 text-center inline-flex items-center">
                                     <span class="flex items-center justify-center w-5 h-5">
                                         <i class="ti ti-plus text-xl"></i>
@@ -305,14 +316,15 @@
                         </div>
 
                         <div>
-                            <template x-for="(attribute, index) in attributes" :key="index">
+                            <template x-for="(variant, variantIndex) in variants" :key="variantIndex">
                                 <div
                                     class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 border border-gray-200 dark:border-gray-600 rounded p-4 pt-8 relative">
-                                    <!-- Variant Type Dropdown -->
+                                    <!-- Variant Type Input -->
                                     <div>
                                         <x-input.label :required="false">Type</x-input.label>
-                                        <x-input.text type="text" x-bind:name="'attribute_values[' + index + '][name]'" x-model="attribute['name']"
-                                            class="mt-1" x-on:change="generateCombinations()" required />
+                                        <x-input.text type="text" class="mt-1"
+                                            x-bind:name="'variants[' + variantIndex + '][type]'"
+                                            x-model="variant.type" x-on:change="generateSkus()" required />
                                     </div>
 
                                     <!-- Variant Options Dropdown -->
@@ -320,37 +332,31 @@
                                         <x-input.label :required="false">Option</x-input.label>
                                         <select
                                             class="bg-gray-50 border border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-green-400 focus:border-green-400 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-green-500 dark:focus:border-green-500"
-                                            placeholder="Type to add options..."
-                                            multiple
-                                            x-data
-                                            x-model="attribute['options']"
-                                            x-bind:name="'attribute_values[' + index + '][options][]'"
-                                            x-on:change="generateCombinations()"
-                                            x-init="
-                                                tom = new TomSelect($el, {
-                                                    valueField: 'value',
-                                                    labelField: 'label',
-                                                    create: true,
-                                                    addPrecedence: true,
-                                                    createFilter: function(input) {
-                                                        input = input.toLowerCase();
-                                                        return !(input in this.options);
-                                                    },
-                                                    options: attribute?.options.map((option) => ({
-                                                        label: option,
-                                                        value: option,
-                                                    })),
-                                                });
+                                            multiple x-bind:name="'variants[' + variantIndex + '][options][]'"
+                                            x-model="variant.options" x-on:change="generateSkus()"
+                                            x-init="let tomSelect = new TomSelect($el, {
+                                                valueField: 'value',
+                                                labelField: 'label',
+                                                create: true,
+                                                addPrecedence: true,
+                                                createFilter: function(input) {
+                                                    input = input.toLowerCase();
+                                                    return !(input in this.options);
+                                                },
+                                                options: variant?.options.map((option) => ({
+                                                    label: option,
+                                                    value: option,
+                                                })),
+                                            });
 
-                                                attribute?.options?.map((option) => {
-                                                    tom.addItem(option);
-                                                });
-                                            ">
+                                            variant?.options?.map((option) => {
+                                                tomSelect.addItem(option);
+                                            });">
                                         </select>
                                     </div>
 
                                     <!-- Button to remove -->
-                                    <x-button.danger @click="removeAttribute(index)"
+                                    <x-button.danger @click="removeVariant(variantIndex)"
                                         class="!p-2 text-center inline-flex items-center absolute top-1.5 right-1.5">
                                         <span class="flex items-center justify-center w-4 h-4">
                                             <i class="ti ti-x text-base"></i>
@@ -360,15 +366,11 @@
                             </template>
                         </div>
 
-                        <!-- SKUs Table -->
-                        <div x-show="attributeCombinations.length" x-cloak class="mt-6 relative overflow-x-auto">
-                            @error('skus.*')
-                                <div class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
-                                    <span class="font-medium">Variation Data Required!</span> Enter product variation data correctly
-                                </div>
-                            @enderror
-                            <table class="w-full min-w-max text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <div x-show="skus.length" x-cloak class="mt-6 relative overflow-x-auto">
+                            <table
+                                class="w-full min-w-max text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                <thead
+                                    class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                     <tr>
                                         <th class="px-4 py-2">
                                             <x-input.label :required="false">Variant</x-input.label>
@@ -394,37 +396,52 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <template x-for="(combination, index) in attributeCombinations" :key="index">
+                                    <template x-for="(sku, index) in skus" :key="index">
                                         <tr>
                                             <td class="px-4 py-2">
-                                                <template x-for="(attr, attrIndex) in combination" :key="attr.attribute + '-' + attrIndex">
-                                                    <div>
-                                                        <input type="hidden" x-bind:name="'skus[' + index + '][attribute_value][' + attrIndex + '][attribute]'"
-                                                            x-model="attr.attribute">
+                                                <div class="flex items-center gap-2">
+                                                    <template x-for="(attr, attrIndex) in sku.attribute_value"
+                                                        :key="attrIndex">
+                                                        <div>
+                                                            <input type="hidden"
+                                                                :name="'skus[' + index + '][attribute_value][' + attrIndex +
+                                                                    '][attribute]'"
+                                                                :value="attr.attribute">
+                                                            <input type="hidden"
+                                                                :name="'skus[' + index + '][attribute_value][' + attrIndex +
+                                                                    '][value]'"
+                                                                :value="attr.value">
+                                                            <span class="inline-block" x-text="attr.value"></span>
+                                                            <template
+                                                                x-if="attrIndex < sku.attribute_value.length - 1">
+                                                                <span class="inline-block ms-2">-</span>
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <x-input.text type="text" placeholder="Price" x-model="sku.price"
+                                                    x-bind:name="'skus[' + index + '][price]'" />
+                                            <td class="px-4 py-2">
+                                                <x-input.text type="text" placeholder="Stock" x-model="sku.stock"
+                                                    x-bind:name="'skus[' + index + '][stock]'" />
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <x-input.text type="text" placeholder="Weight"
+                                                    x-model="sku.weight"
+                                                    x-bind:name="'skus[' + index + '][weight]'" />
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <x-input.text type="text" placeholder="SKU" x-model="sku.sku"
+                                                    x-bind:name="'skus[' + index + '][sku]'" />
+                                            </td>
 
-                                                        <input type="hidden" x-bind:name="'skus[' + index + '][attribute_value][' + attrIndex + '][value]'"
-                                                            x-model="attr.value">
-
-                                                        <span x-text="attr.value"></span>
-                                                    </div>
-                                                </template>
-                                            </td>
-                                            <td class="px-4 py-2">
-                                                <x-input.text type="text" placeholder="Price" x-bind:name="'skus[' + index + '][price]'" />
-                                            </td>
-                                            <td class="px-4 py-2">
-                                                <x-input.text type="text" placeholder="Stock" x-bind:name="'skus[' + index + '][stock]'" />
-                                            </td>
-                                            <td class="px-4 py-2">
-                                                <x-input.text type="text" placeholder="Weight" x-bind:name="'skus[' + index + '][weight]'" />
-                                            </td>
-                                            <td class="px-4 py-2">
-                                                <x-input.text type="text" placeholder="SKU" x-bind:name="'skus[' + index + '][sku]'" />
-                                            </td>
                                             <td class="px-4 py-2">
                                                 <label class="inline-flex items-center cursor-pointer">
-                                                    <input type="hidden" x-bind:name="'skus[' + index + '][is_active]'" value="0">
-                                                    <input type="checkbox" value="1" x-bind:name="'skus[' + index + '][is_active]'" class="sr-only peer" checked />
+                                                    <input type="checkbox" class="sr-only peer"
+                                                        x-model.boolean="sku.is_active"
+                                                        x-bind:name="'skus[' + index + '][is_active]'" />
                                                     <div
                                                         class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600">
                                                     </div>
@@ -432,17 +449,18 @@
                                             </td>
                                             <td class="px-4 py-2">
                                                 <label class="inline-flex items-center cursor-pointer">
-                                                    <!-- Hidden input for unchecked value -->
-                                                    <input type="hidden" x-bind:name="'skus[' + index + '][is_default]'" value="0">
-
-                                                    <!-- Checkbox input for is_default -->
-                                                    <input type="checkbox" value="1"
+                                                    <input type="checkbox" class="sr-only peer"
+                                                        {{-- x-model.boolean="sku.is_default" --}}
                                                         x-bind:name="'skus[' + index + '][is_default]'"
-                                                        x-bind:checked="selectedDefaultSku === index"
-                                                        x-on:change="selectedDefaultSku = index"
-                                                        class="sr-only peer" />
+                                                        x-bind:value="sku.is_default"
+                                                        x-on:change="
+                                                            skus.forEach((item, idx) => {
+                                                                item.is_default = false;
+                                                            });
 
-                                                    <!-- Toggle UI -->
+                                                            sku.is_default = true;
+                                                        "
+                                                    />
                                                     <div
                                                         class="relative w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600">
                                                     </div>
@@ -453,7 +471,6 @@
                                 </tbody>
                             </table>
                         </div>
-
                     </div>
 
                     <div class="col-span-6">

@@ -10,19 +10,6 @@ use Illuminate\Validation\Rule;
 
 class MerchantsRequest extends FormRequest
 {
-    protected function prepareForValidation()
-    {
-        $socialLinks = array_map(function ($link) {
-            $link['platform'] = strtolower($link['platform']);
-            return $link;
-        }, $this->input('social_links', []));
-
-        $this->merge([
-            'social_links' => $socialLinks,
-            'user_id' => (int) $this->input('user_id')
-        ]);
-    }
-
     public function authorize(): bool
     {
         return true;

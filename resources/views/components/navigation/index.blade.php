@@ -7,7 +7,7 @@
 
 {{-- @dump($categories) --}}
 
-<nav class="fixed z-[999999] w-full bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+<nav class="fixed z-[99] w-full bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
     <nav class="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-700">
         <div class="max-w-screen-xl px-8 py-1.5 mx-auto">
             <div class="flex items-center">

@@ -59,7 +59,7 @@ class CategoriesController extends Controller
             }
         }
 
-        $featured = $request->featured === '1';
+        $featured = $request->featured == '1';
 
         Category::create([
             ...$request->validated(),
@@ -68,15 +68,16 @@ class CategoriesController extends Controller
             'icon' => $iconPath,
             'slug' => str()->slug($request->name),
         ]);
+        $callbackUrl = $request->query('callbackUrl', route('admin.products.categories.index'));
 
         if ($request->has('create_another')) {
-            return redirect()->route('admin.products.categories.create')->with('toast-notification', [
+            $createPageUrlWithParams = route('admin.products.categories.create') . '?callbackUrl=' . rawurlencode($callbackUrl);
+
+            return redirect($createPageUrlWithParams)->with('toast-notification', [
                 'type' => 'success',
                 'message' => "New category has been added! You can create another one.",
             ]);
         }
-
-        $callbackUrl = $request->query('callbackUrl', route('admin.products.categories.index'));
 
         return redirect($callbackUrl)
             ->with('toast-notification', [

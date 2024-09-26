@@ -16,10 +16,6 @@
                     'text' => 'Sliders',
                     'href' => '/admin/sliders',
                 ],
-                [
-                    'text' => 'Banners',
-                    'href' => '/admin/banners',
-                ],
             ],
         ],
         [

@@ -9,9 +9,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+use function PHPUnit\Framework\isEmpty;
+
 class Merchant extends Model
 {
     use HasFactory;
+
+    // protected $with = ['user'];
 
     protected $fillable = [
         'name',
@@ -22,28 +26,19 @@ class Merchant extends Model
         'social_links',
     ];
 
-    // protected $casts = [
-    //     'social_links' => 'array',
-    // ];
+    protected $casts = [
+        'social_links' => 'array',
+    ];
 
     protected function socialLinks(): Attribute
     {
         return Attribute::make(
             get: function (string $value) {
-                // Decode JSON menjadi array saat mengakses
+                // Decode JSON menjadi array assosiatif saat mengakses
                 $data = json_decode($value, true);
 
                 return $data;
             },
-            set: function ($value) {
-                // Asumsikan $value adalah array of objects, ubah menjadi array key-value dan encode ke JSON
-                $formattedLinks = [];
-                foreach ($value as $item) {
-                    $formattedLinks[$item['platform']] = $item['link'];
-                }
-
-                return json_encode($formattedLinks);
-            }
         );
     }
 
@@ -51,14 +46,14 @@ class Merchant extends Model
     {
         return Attribute::make(
             get: function () {
-                $links = $this->social_links;
+                $links = $this->social_links ? $this->social_links : [];
 
                 if (empty($links)) {
                     return 'No social links';
                 }
 
-                return collect($links)->map(function ($link, $platform) {
-                    return ucfirst($platform) . ": '{$link}'";
+                return collect($links)->map(function ($link) {
+                    return ucfirst($link['platform']) . ": '{$link['link']}'";
                 })->implode(', ');
             }
         );

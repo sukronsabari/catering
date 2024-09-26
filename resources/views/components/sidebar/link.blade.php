@@ -8,8 +8,11 @@
 ])
 
 @if ($type === 'single')
-    <a href="{{ $href }}"
-        class="flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100 group dark:text-gray-200 dark:hover:bg-gray-700">
+    <a
+        wire:navigate
+        href="{{ $href }}"
+        class="flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100 group dark:text-gray-200 dark:hover:bg-gray-700"
+    >
         @if ($icon)
             <i class="{{ $icon }} block flex-shrink-0 text-2xl text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"></i>
         @endif
@@ -42,9 +45,14 @@
         <ul x-show="open" x-bind:class="!open ? 'hidden' : ''" class="py-2 space-y-2">
             @foreach ($collapseItems as $item)
                 <li>
-                    <a href="{{ $item['href'] }}"
-                        class="flex items-center p-2 text-base text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700">
+                    <a
+                        wire:navigate
+                        href="{{ $item['href'] }}"
+                        class="flex items-center p-2 text-base text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+
+                    >
                         {{ $item['text'] }}
+
                     </a>
                 </li>
             @endforeach

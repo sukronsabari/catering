@@ -43,15 +43,16 @@ class SlidersController extends Controller
         }
 
         Slider::create([...$request->validated(), 'image' => $imagePath, 'is_active' => $isActive]);
+        $callbackUrl = $request->query('callbackUrl', route('admin.sliders.index'));
 
         if ($request->has('create_another')) {
-            return redirect()->route('admin.sliders.create')->with('toast-notification', [
+            $createPageUrlWithParams = route('admin.sliders.create') . '?callbackUrl=' . rawurlencode($callbackUrl);
+
+            return redirect($createPageUrlWithParams)->with('toast-notification', [
                 'type' => 'success',
                 'message' => "New slider has been added! You can create another one.",
             ]);
         }
-
-        $callbackUrl = $request->query('callbackUrl', route('admin.sliders.index'));
 
         return redirect($callbackUrl)
             ->with('toast-notification', [

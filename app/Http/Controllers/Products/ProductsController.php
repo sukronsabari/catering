@@ -10,6 +10,7 @@ use App\Models\Merchant;
 use App\Models\ProductAttribute;
 use App\Models\ProductImage;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -31,8 +32,9 @@ class ProductsController extends Controller
         ]);
     }
 
-    public function store(ProductsRequest $request)
+    public function store(ProductsRequest $request): RedirectResponse
     {
+        dd($request->all());
         $images = collect($request->images)->filter(function ($image) {
             return isset($image['file']) && $image['file'] instanceof UploadedFile;
         });
@@ -53,9 +55,6 @@ class ProductsController extends Controller
                 'message' => 'There was an error uploading one or more images. Please try again.'
             ]);
         }
-
-        // Set Variant Is_Default
-
 
         DB::transaction(function () use ($request, $productImagePayloads) {
             $merchant = Merchant::findOrFail($request->merchant_id);
@@ -99,7 +98,7 @@ class ProductsController extends Controller
                         $attribute->product_id = $product->id;
                         $attribute->save();
 
-                        $sku->attributes()->attach($attribute->id, ['value' => $attributeData['value']]);
+                        $sku->productAttributes()->attach($attribute->id, ['value' => $attributeData['value']]);
                     }
                 }
             } else {
@@ -141,9 +140,10 @@ class ProductsController extends Controller
             ]);
     }
 
-    public function edit(Product $product)
+    public function edit(Product $product): View
     {
         $categories = Category::tree()->get()->toTree();
+
         $productImages = $product->images->map(function ($productImage) {
             return [
                 'id' => $productImage->id,
@@ -153,13 +153,40 @@ class ProductsController extends Controller
             ];
         })->toJson();
 
-        // dd($productImages);
+        $variants = $product->productAttributes->map(function ($attribute) {
+            return [
+                'type' => $attribute->name,
+                'options' => $attribute->skus->pluck('pivot.value')->unique()->toArray(),
+            ];
+        });
+
+        $skus = $product->skus->map(function ($sku) {
+            return [
+                'id' => $sku->id,
+                'attribute_value' => $sku->productAttributes->map(function ($attribute) {
+                    return [
+                        'attribute' => $attribute->name,
+                        'value' => $attribute->pivot->value,
+                    ];
+                }),
+                'price' => (int) $sku->price,
+                'stock' => $sku->stock,
+                'weight' => (int) $sku->weight,
+                'sku' => $sku->sku,
+                'is_active' => $sku->is_active ? 'on' : '',
+                'is_default' => $sku->is_default ? 'on' : '',
+            ];
+        });
+
         return view('admin.products.edit', [
             'categories' => $categories,
             'product' => $product,
             'productImages' => $productImages,
+            'variants' => $variants->toArray(),
+            'skus' => $skus->toArray(),
         ]);
     }
+
 
     public function update(ProductsRequest $request, Product $product)
     {
@@ -204,7 +231,6 @@ class ProductsController extends Controller
                 $selectedCategory = Category::findOrFail((int) $request->category_id);
 
                 $product->category()->associate($selectedCategory);
-                var_dump("CATEGORY BERUBAH");
             }
 
             if ($product->merchant_id !== (int) $request->merchant_id) {
@@ -213,6 +239,7 @@ class ProductsController extends Controller
                 $product->merchant()->associate($selectedMerchant);
             }
 
+            $product->slug = null;
             $product->update([
                 'name' => $request->name,
                 'price' => $request->price,

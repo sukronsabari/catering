@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('merchant_id')->constrained('merchants')->onDelete('cascade');
             $table->foreignId('category_id')->nullable()->constrained('categories')->onDelete('set null');
             $table->string('name');
+            $table->string('slug');
             $table->text('description');
             $table->char('currency_code', 3)->default('IDR');
             $table->decimal('price', 10, 2)->default(0);

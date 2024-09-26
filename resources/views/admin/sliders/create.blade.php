@@ -19,7 +19,7 @@
     <div class="px-4 pt-6">
         <div
             class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 sm:p-6 dark:bg-gray-800 text-gray-900 dark:text-white">
-            <form action="{{ route('admin.sliders.store') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ route('admin.sliders.store', ['callbackUrl' => request()->query('callbackUrl')]) }}" method="POST" enctype="multipart/form-data">
                 @method('POST')
                 @csrf
                 <div class="grid grid-cols-6 gap-6">

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Cviebrock\EloquentSluggable\Sluggable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,10 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Product extends Model
 {
     use HasFactory;
-
-    protected $attributes = [
-        'description' => 'Read before buying',
-    ];
+    use Sluggable;
 
     protected $fillable = [
         'name',
@@ -26,6 +24,15 @@ class Product extends Model
         'sku',
         'has_variation',
     ];
+
+    public function sluggable(): array
+    {
+        return [
+            'slug' => [
+                'source' => 'name'
+            ]
+        ];
+    }
 
     public function merchant(): BelongsTo
     {
@@ -42,7 +49,7 @@ class Product extends Model
         return $this->hasMany(ProductImage::class);
     }
 
-    public function attributes(): HasMany
+    public function productAttributes(): HasMany
     {
         return $this->hasMany(ProductAttribute::class);
     }

@@ -19,7 +19,7 @@ class MerchantSeeder extends Seeder
 
         $officialMerchantUser->merchant()->create([
             'name' => 'Official Store',
-            'banner_image' => '/images/merchants/banners/default.png',
+            'banner_image' => 'images/merchants/banners/default.png',
             'description' => 'Official store for eccomerce',
             'phone' => '+62 82253784251',
             'social_links' => [
@@ -39,7 +39,7 @@ class MerchantSeeder extends Seeder
             $merchantUser->merchant()->create([
                 'name' => fake()->name(),
                 'is_official' => false,
-                'banner_image' => '/images/merchants/banners/default.png',
+                'banner_image' => 'images/merchants/banners/default.png',
                 'description' => fake()->paragraph(),
                 'phone' => fake()->phoneNumber(),
                 'social_links' => [
